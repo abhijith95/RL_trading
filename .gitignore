@@ -19,3 +19,16 @@ Daily_stocks_data/SWED-A.xlsx
 Daily_stocks_data/SWMA.xlsx
 Daily_stocks_data/TEL2-B.xlsx
 Daily_stocks_data/TELIA.xlsx
+.vscode/settings.json
+__pycache__/agent.cpython-310.pyc
+__pycache__/env.cpython-310.pyc
+__pycache__/memory.cpython-310.pyc
+__pycache__/networks.cpython-310.pyc
+Best_model/keras_metadata.pb
+Best_model/saved_model.pb
+Best_model/variables/variables.data-00000-of-00001
+Best_model/variables/variables.index
+Best_weights/actor.h5
+Best_weights/critic.h5
+Best_weights/target-actor.h5
+Best_weights/target-critic.h5
