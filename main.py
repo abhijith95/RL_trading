@@ -23,13 +23,14 @@ def trainAgent(saveDir):
     Args:
         saveDir (string): folder location to save the model with maximum reward
     """
+    growthRecord = []
     bestReward = -np.inf
     for i in range(EPOCHS):
         tradingAgent.reset()
         startIndex = random.randint(TRAINING_INDICES[0]+MARKET_MEMORY,
                                     TRAINING_INDICES[1]-EPOCH_SIZE)
-        rewardRecord = []
         print("Training epoch: ", i)
+        initPortfolioValue = tradingAgent.getReward()
         
         for index in range(startIndex, startIndex+EPOCH_SIZE):
             state = tradingAgent.getState(index)
@@ -44,18 +45,21 @@ def trainAgent(saveDir):
             
             if done:
                 break
+            # end for
             
-        rewardRecord.append(reward)
+        growthRecord.append((reward - initPortfolioValue)/ initPortfolioValue)
         
         if reward > bestReward:
             bestReward = reward
             tradingAgent.saveModels()
             bestModel = tradingAgent.actor
             bestModel.save(saveDir)
+        # end for
+    plt.plot(range(EPOCHS), growthRecord)
     
-    plt.plot(range(EPOCHS), rewardRecord)
+    return bestModel
 
 def testAgent():
     pass
 
-trainAgent(MODEL_SAVE_DIR)
+bestModel = trainAgent(MODEL_SAVE_DIR)

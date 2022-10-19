@@ -48,7 +48,7 @@ class memory:
             if i!=4 and i!=2:
                 # we don't want to convert "done", "rewards" to tensor
                 temp = tf.convert_to_tensor(temp)
-            if i == 4 or i == 2:
+            else:
                 # convert "done" and "rewards" to numpy array
                 temp = np.array(temp)
             info.append(temp)            
