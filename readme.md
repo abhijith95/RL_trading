@@ -9,7 +9,7 @@ uses actor-critic algorithm to get the optimal trading strategy
 The excel data to be used in this problem shall be built by using
 the dataBuilder module. Please note that each sheet in excel shall
 contain the data for Open, High, Low, Close, Adj Close, Volume. 
-Also kindly ensure that the naming of these sheets
+Also kindly ensure that the naming of these sheets as they 
 are case sensitive and have it the same as described above.
 
 ## States and actions
@@ -39,13 +39,6 @@ comission rate shall be applied while calculating the portfolio
 value. Note that the portfolio value will be sum of the value 
 of assets and remaining cash. 
 
-## Training the networks
-The data file contains every day price of 15 different stocks
-(primarily from Swedish market), from 2011 Jan to 2022 Oct.
-The training data will be from 2011 Jan to 2020 Dec, the test
-data set will be from 2021 Jan till end of the data. There is 
-no validation set to tune the hyperparameters in this case.
-
 ## The network
 Both the actor and critic network will be made of sequentially
 built dense NN layers. The output from the actor network will
@@ -55,3 +48,10 @@ of the output will add to 1, which is required because we don't
 consider shorting any stocks in this problem. Secondly the value
 of each entity in array will be in range [0,1], which potrays
 the proportion of a stock in the portfolio.
+
+## Training the networks
+The data file contains every day price of 21 different stocks
+(primarily from Swedish market), from 2011 Jan to 2022 Oct.
+The training data will be from 2011 Jan to 2020 Dec, the test
+data set will be from 2021 Jan till end of the data. There is 
+no validation set to tune the hyperparameters in this case.

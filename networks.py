@@ -26,7 +26,8 @@ class criticNetwork(keras.Model):
         """
         Args:
             state (tensor): state of the current environment
-            of shape (1,5,market_memory,number_of_assets)
+            of shape (1,number_of_price_features,
+            market_memory,number_of_assets)
             action (tensor): _description_
 
         Returns:
@@ -64,7 +65,7 @@ class actorNetwork(keras.Model):
         """
         Args:
             state (tensorflow tensor): state of the current environment
-            of shape (1,5,market_memory,number_of_assets)
+            of shape (1,number_of_price_features,market_memory,number_of_assets)
 
         Returns:
             tensorflow tensor: action predicted by the NN. This tensor is of

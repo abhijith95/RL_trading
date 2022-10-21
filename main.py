@@ -9,8 +9,8 @@ WTS_SAVE_DIR = "C:\\Users\\abhij\\RL_trading\\Best_weights"
 DATA_FILE = "C:\\Users\\abhij\\RL_trading\\Daily_stocks_data\\portfolio.xlsx"
 SHEET_NAMES = ["Open", "High", "Low", "Close", "Volume"]
 TRAINING_INDICES = [0,2259]
-EPOCHS = 1000
-EPOCH_SIZE = 500  # nunber of consecutive days to train the agent
+EPOCHS = 2000
+EPOCH_SIZE = 30  # nunber of consecutive days to train the agent
 MARKET_MEMORY = 10
 
 tradingAgent = agent(dataFile= DATA_FILE, sheetNames= SHEET_NAMES,
@@ -56,6 +56,7 @@ def trainAgent(saveDir):
             bestModel.save(saveDir)
         # end for
     plt.plot(range(EPOCHS), growthRecord)
+    plt.show()
     
     return bestModel
 

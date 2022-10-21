@@ -40,7 +40,7 @@ class agent(env):
         self.memory = memory(maxMemorySize)
         self.batchSize = batchSize
         
-        inputShape = (1,5,self.marketMemory, self.noOfAssets)
+        inputShape = (1,self.noOfPriceFeatures,self.marketMemory, self.noOfAssets)
         self.actor = actorNetwork(directory=outputDir, outputSize=self.noOfAssets,
                                 inputShape=inputShape)
         self.critic = criticNetwork(directory = outputDir, stateShape=inputShape,
@@ -91,7 +91,8 @@ class agent(env):
         """Method to store the experience in the momory buffer
         Args:
             state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (5,marketMemory, number_of_assets)
+            all the assets. The shape of the tensor is (number_of_price_features,
+            marketMemory, number_of_assets)
             
             action (tensory): asset proportions. Shape of tensory is (number_of_assets, 1)
             reward (float): portofolio value
@@ -105,7 +106,8 @@ class agent(env):
         of the environment
         Args:
             state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (5,marketMemory, number_of_assets)
+            all the assets. The shape of the tensor is (number_of_price_features,
+            marketMemory, number_of_assets)
             evaluate (bool, optional): _description_. Defaults to False.
 
         Returns:
@@ -124,6 +126,7 @@ class agent(env):
         
         with tf.GradientTape() as tape:
             target_actions = self.targetActor(states_)
+            # this is the future reward; reward at next time step
             critic_value_ = tf.squeeze(self.targetCritic(
                                 states_, target_actions), 1)
             critic_value = tf.squeeze(self.critic(states, actions), 1)

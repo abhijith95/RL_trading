@@ -19,7 +19,8 @@ class memory:
         """Method to store the experience in the momory buffer
         Args:
             state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (1,5,marketMemory, number_of_assets)
+            all the assets. The shape of the tensor is (1,number_of_price_features,
+            marketMemory, number_of_assets)
             
             action (tensor): asset proportions. Shape of tensory is (1,number_of_assets)
             reward (float): portofolio value

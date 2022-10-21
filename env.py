@@ -30,8 +30,9 @@ class env:
         self.marketMemory = marketMemory
         # -1 because columns include data as well
         self.noOfAssets = len(self.dfs["Open"].columns) - 1 
-        self.brokerFee = 39   # transaction fee for every buy and sell, in SEK
-        self.maxAssetOrder = 20000  # maximum money spent in buying an asset, in SEK     
+        self.noOfPriceFeatures = len(sheetNames)
+        self.brokerFee = 39.0   # transaction fee for every buy and sell, in SEK
+        self.maxAssetOrder = 21000.0  # maximum money spent in buying an asset, in SEK     
         self.totalInv = self.maxAssetOrder * self.noOfAssets  # total amount invested in assets
         self.reset()
     
@@ -42,9 +43,9 @@ class env:
         """
         # initially the asset proportion will be uniform and equal
         self.assetProp = np.ones(self.noOfAssets) * (1/self.noOfAssets)
-        self.cash = self.maxAssetOrder     
+        self.cash = np.copy(self.maxAssetOrder)     
         self.assetVal = self.assetProp * (self.totalInv)
-        self.portVal = np.sum(self.assetVal) + self.cash   
+        self.portVal = np.sum(self.assetVal)  
         self.penalty = 0  # if cash is depleted the agent gets a big penalty
         
     def getState(self, index):
@@ -53,7 +54,8 @@ class env:
             index (int): the index of the current time step
         Returns:
             state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (5,self.marketMemory, self.noOfAssets)
+            all the assets. The shape of the tensor is (number_of_price_features,
+            self.marketMemory, self.noOfAssets)
         """
         state = []
         for key in self.train:
@@ -61,7 +63,7 @@ class env:
             state.append(list(np.array(self.train[key].iloc[index - self.marketMemory:index,0:self.noOfAssets])))  
         
         state = tf.convert_to_tensor(state)
-        state = tf.reshape(state, shape=[1,5,self.marketMemory,self.noOfAssets])
+        state = tf.reshape(state, shape=[1,self.noOfPriceFeatures,self.marketMemory,self.noOfAssets])
         return state
 
     def transact(self,action,index):
@@ -73,25 +75,33 @@ class env:
             and sell must be done before trading starts.
         index (int): the index of the current time step
         """
-        action = np.array(action)
-        for i in range(len(action)):
-            # amount of money to buy/sell
-            delta = (action[i] - self.assetProp[i]) * self.assetVal[i]  
-            noOfShares = delta/self.train["Close"].iloc[index,i]
-            # execute transaction only if number of shares is greater than 1
-            # else the broker will not execute the order
-            if action[i] > self.assetProp[i]:
-                # need to buy more shares                
-                if noOfShares > 1:
-                    self.cash-=delta
-                    self.assetProp[i] = action[i]                
-            else:
-                # need to sell shares
-                if noOfShares > 1:
-                    self.cash+=delta
-                    self.assetProp[i] = action[i] 
+        # action = np.array(action)
+        delta = np.abs(action - self.assetProp)*self.portVal
+        noOfShares = delta/np.array(self.train["Close"].iloc[index,:])
+        mask1 = np.where(noOfShares>1,1,0)
+        mask2 = np.where(action>self.assetProp,1,-1)
+        self.assetVal = self.assetVal+(mask1*mask2*delta)
+        self.cash+=np.sum(mask1*-mask2*delta)
+        # for i in range(len(action)):
+        #     # amount of money to buy/sell
+        #     delta = abs((action[i] - self.assetProp[i]) * self.portVal)
+        #     noOfShares = delta/self.train["Close"].iloc[index,i]
+        #     # execute transaction only if number of shares is greater than 1
+        #     # else the broker will not execute the order
+        #     if action[i] > self.assetProp[i]:
+        #         # need to buy more shares                
+        #         if noOfShares > 1:
+        #             self.cash-=delta
+        #             self.assetVal[i]+=delta
+        #             self.assetProp[i] = action[i]                
+        #     else:
+        #         # need to sell shares
+        #         if noOfShares > 1:
+        #             self.cash+=delta
+        #             self.assetVal[i]-=delta
+        #             self.assetProp[i] = action[i] 
         
-        self.portVal = np.sum(self.assetVal) + self.cash
+        self.portVal= np.sum(self.assetVal)  # this should keep the porfolio value unchanged.
         if self.cash < 0:
             # huge penalty if cash reserve is used up!
             self.penalty = -self.totalInv
@@ -114,10 +124,10 @@ class env:
         priceRatio = np.array(self.train["Close"].iloc[index+1,:]) / \
                         np.array(self.train["Close"].iloc[index,:])
         self.assetVal = self.assetVal * priceRatio
-        self.portVal = np.sum(self.assetVal) + self.cash
+        self.portVal = np.sum(self.assetVal)
                 
     def getReward(self):
-        return (self.portVal+self.penalty)
+        return (self.portVal+self.penalty+self.cash)
     
     def isDone(self):
         """If the cash reserve is used up the epoch will end.
