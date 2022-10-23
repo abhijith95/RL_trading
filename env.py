@@ -21,14 +21,16 @@ class env:
         """
         self.dfs = {}
         self.train, self.test = {}, {}
+        self.marketMemory = marketMemory
+        self.trainingIndex = trainingIndex
         
         for sheet in sheetNames:
+            # standardizing the testing and training data
             self.dfs[sheet]=pd.read_excel(dataFile, sheet_name=sheet)
             self.train[sheet]=self.dfs[sheet].iloc[trainingIndex[0]:trainingIndex[1],0:-1]
             self.test[sheet]=self.dfs[sheet].iloc[trainingIndex[1]:,0:-1]
         
-        self.marketMemory = marketMemory
-        # -1 because columns include data as well
+        # -1 because columns include date as well
         self.noOfAssets = len(self.dfs["Open"].columns) - 1 
         self.noOfPriceFeatures = len(sheetNames)
         self.brokerFee = 39.0   # transaction fee for every buy and sell, in SEK
@@ -48,65 +50,62 @@ class env:
         self.portVal = np.sum(self.assetVal)  
         self.penalty = 0  # if cash is depleted the agent gets a big penalty
         
-    def getState(self, index):
+    def getState(self, index, train=True):
         """Method that returns the current state of the environment
         Args:
             index (int): the index of the current time step
+            train (bool): whether the function is called during training or
+            testing.
         Returns:
             state (tensor): the past marketMemory days of OHCLV value for
             all the assets. The shape of the tensor is (number_of_price_features,
             self.marketMemory, self.noOfAssets)
         """
         state = []
-        for key in self.train:
+        for key in self.dfs:
             # going through the dictionary
-            state.append(list(np.array(self.train[key].iloc[index - self.marketMemory:index,0:self.noOfAssets])))  
+            if train:
+                state.append(list(np.array(self.train[key].iloc
+                                        [index - self.marketMemory:index,:])))  
+            else:
+                state.append(list(np.array(self.test[key].iloc
+                                        [index - self.marketMemory:index,:])))
         
         state = tf.convert_to_tensor(state)
-        state = tf.reshape(state, shape=[1,self.noOfPriceFeatures,self.marketMemory,self.noOfAssets])
+        state = tf.reshape(state, shape=[1,self.noOfPriceFeatures,
+                                        self.marketMemory,self.noOfAssets])
         return state
 
-    def transact(self,action,index):
+    def transact(self,action,index,train):
         """Function that buys and sells assets. The cash used to buy
         and sell is credited/debited to the cash variable.
         Args:
-        action (tensor of shape (self.noOfAssets, )): this is the asset 
-            proportions to have before stepping through the trading day. All buy 
-            and sell must be done before trading starts.
+        action (numpy array of shape (self.noOfAssets, )): this is the asset 
+        proportions to have before stepping through the trading day. All buy 
+        and sell must be done before trading starts.
         index (int): the index of the current time step
+        train (bool): whether the function call is used for training or testing.
         """
         # action = np.array(action)
-        delta = np.abs(action - self.assetProp)*self.portVal
-        noOfShares = delta/np.array(self.train["Close"].iloc[index,:])
+        delta = (action - self.assetProp)*self.portVal
+        if train:
+            price = np.array(self.train["Close"].iloc[index,:])        
+        else:
+            index+=self.trainingIndex[1]
+            price = np.array(self.test["Close"].iloc[index,:])
+            
+        noOfShares = np.abs(delta/price)
+        # mask 1 is to filter out those assets whose shares to transact is less than 1
         mask1 = np.where(noOfShares>1,1,0)
-        mask2 = np.where(action>self.assetProp,1,-1)
-        self.assetVal = self.assetVal+(mask1*mask2*delta)
-        self.cash+=np.sum(mask1*-mask2*delta)
-        # for i in range(len(action)):
-        #     # amount of money to buy/sell
-        #     delta = abs((action[i] - self.assetProp[i]) * self.portVal)
-        #     noOfShares = delta/self.train["Close"].iloc[index,i]
-        #     # execute transaction only if number of shares is greater than 1
-        #     # else the broker will not execute the order
-        #     if action[i] > self.assetProp[i]:
-        #         # need to buy more shares                
-        #         if noOfShares > 1:
-        #             self.cash-=delta
-        #             self.assetVal[i]+=delta
-        #             self.assetProp[i] = action[i]                
-        #     else:
-        #         # need to sell shares
-        #         if noOfShares > 1:
-        #             self.cash+=delta
-        #             self.assetVal[i]-=delta
-        #             self.assetProp[i] = action[i] 
-        
+        self.assetVal = self.assetVal+(mask1*delta)
+        # subtracting broker fee for both buy/sell transaction
+        self.cash+= -np.sum(mask1*delta) - (np.sum(mask1)*self.brokerFee)               
         self.portVal= np.sum(self.assetVal)  # this should keep the porfolio value unchanged.
-        if self.cash < 0:
+        if self.cash < 0 or self.portVal < 0:
             # huge penalty if cash reserve is used up!
             self.penalty = -self.totalInv
     
-    def stepDt(self, action, index):
+    def stepDt(self, action, index,train=True):
         """
         Function that carries the epoch through one time step. In this case 
         the environment runs through one day of trading and calculates the gains.
@@ -117,24 +116,33 @@ class env:
         proportions to have before stepping through the trading day. All buy 
         and sell must be done before trading starts.
         index (int): the index of the current time step
+        train(boolean): whether the function is called during training or testing
         """
         # buying and selling assets
-        self.transact(action,index)
-        
-        priceRatio = np.array(self.train["Close"].iloc[index+1,:]) / \
-                        np.array(self.train["Close"].iloc[index,:])
+        self.transact(action,index,train) 
+        if train:       
+            priceRatio = np.array(self.train["Close"].iloc[index+1,:]) / \
+                            np.array(self.train["Close"].iloc[index,:])
+        else:
+            index+=self.trainingIndex[1]
+            priceRatio = np.array(self.test["Close"].iloc[index+1,:]) / \
+                        np.array(self.test["Close"].iloc[index,:])
         self.assetVal = self.assetVal * priceRatio
         self.portVal = np.sum(self.assetVal)
                 
     def getReward(self):
-        return (self.portVal+self.penalty+self.cash)
+        done = self.isDone()
+        if done:
+            return 0
+        else:
+            return (self.portVal+self.cash)
     
     def isDone(self):
         """If the cash reserve is used up the epoch will end.
         Returns:
             Boolean: signifies the end of an epoch
         """
-        if self.cash < 0:
+        if self.cash < 0 or np.any(self.portVal < 0):
             return True
         return False
     

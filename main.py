@@ -60,7 +60,34 @@ def trainAgent(saveDir):
     
     return bestModel
 
-def testAgent():
-    pass
+def testAgent(actorModel):
+    """Function that tests the bestModel
+
+    Args:
+        actorModel (tensorflow model): best actor model trained by the agent
+    """
+    growthRecord = []
+    portfolioVal = []
+    tradingAgent.reset()
+    initPortfolioValue = tradingAgent.getReward()
+    # portfolioVal.append(tradingAgent.portVal)
+    loopRange = range(tradingAgent.marketMemory+1,
+                    len(tradingAgent.test['Close'])-1)
+    
+    for index in loopRange:        
+        state = tradingAgent.getState(index, False)
+        action = actorModel(state)
+        action = np.array(action).reshape(tradingAgent.noOfAssets,)
+        tradingAgent.stepDt(action,index, False)        
+        reward = tradingAgent.getReward()
+        growthRecord.append((reward)/ initPortfolioValue)
+        portfolioVal.append(tradingAgent.portVal/initPortfolioValue)
+    
+    print("Cumulative gains = ", 
+        ((reward - initPortfolioValue)/ initPortfolioValue))
+    plt.plot(loopRange, growthRecord)
+    plt.show()
 
 bestModel = trainAgent(MODEL_SAVE_DIR)
+bestModel = tf.keras.models.load_model(MODEL_SAVE_DIR)
+testAgent(bestModel)
