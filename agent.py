@@ -18,8 +18,7 @@ class agent(env):
             dataFile (string): location of the excel file
             sheetNames (list): list of sheet names holding the OHCLV data
             trainingIndex (list): list containing the starting and ending index
-            for the training data set.
-            
+            for the training data set.            
             outputDir (string): folder location to save the NN weights
             alpha (float, optional): learning rate for actor network. Defaults to 0.001.
             beta (float, optional): learning rate for critic network. Defaults to 0.002.
@@ -42,11 +41,12 @@ class agent(env):
         
         inputShape = (1,self.noOfPriceFeatures,self.marketMemory, self.noOfAssets)
         self.actor = actorNetwork(directory=outputDir, outputSize=self.noOfAssets,
-                                inputShape=inputShape)
+                                inputShape=inputShape,actionShape=(1,self.noOfAssets))
         self.critic = criticNetwork(directory = outputDir, stateShape=inputShape,
                                     actionShape=(1,self.noOfAssets))
         self.targetActor = actorNetwork(directory=outputDir, name = 'target-actor', 
-                                        outputSize=self.noOfAssets,inputShape=inputShape)
+                                        outputSize=self.noOfAssets,inputShape=inputShape,
+                                        actionShape=(1,self.noOfAssets))
         self.targetCritic = criticNetwork(directory = outputDir, name = 'target-critic',
                                         actionShape=(1,self.noOfAssets),stateShape=inputShape)
         
@@ -87,33 +87,23 @@ class agent(env):
         self.critic.load_weights(self.critic.chkptFile)
         self.targetCritic.load_weights(self.targetCritic.chkptFile)
     
-    def remember(self,state,action,reward,newState,done):
-        """Method to store the experience in the momory buffer
-        Args:
-            state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (number_of_price_features,
-            marketMemory, number_of_assets)
-            
-            action (tensory): asset proportions. Shape of tensory is (number_of_assets, 1)
-            reward (float): portofolio value
-            newState (tensor): state of the environment after taking a step
-            done (boolean): to indicate if the epoch training is finished or not
-        """
-        self.memory.storeTransition(state,action,reward,newState,done)
+    def remember(self,ohclv,assetProp,cash,
+                ohclv_,assetProp_,cash_,
+                reward,done):
+        
+        self.memory.storeTransition(ohclv,assetProp,cash,
+                                ohclv_,assetProp_,cash_,
+                                reward,done)
     
-    def takeAction(self,state,evaluate = False):
+    def takeAction(self,ohclv,assetProp,cash):
         """Method that returns the asset proportions depending on the current state
         of the environment
         Args:
-            state (tensor): the past marketMemory days of OHCLV value for
-            all the assets. The shape of the tensor is (number_of_price_features,
-            marketMemory, number_of_assets)
-            evaluate (bool, optional): _description_. Defaults to False.
-
+            Check the call function for actor class in "networks" module
         Returns:
             tensor: of shape (1,number_of_assets)
         """
-        action = self.actor(state)
+        action = self.actor(ohclv,assetProp,cash)
         action = tf.reshape(action, shape=[1,self.noOfAssets])
         return action
     
@@ -121,16 +111,17 @@ class agent(env):
         if self.memory.memoryCtr < self.batchSize:
             return
 
-        states, actions, rewards, states_, done = \
-            self.memory.sampleBuffer(self.batchSize)
+        ohclv,asseProp,cash, ohclv_,asseProp_,cash_,\
+        reward,done = self.memory.sampleBuffer(self.batchSize)
         
         with tf.GradientTape() as tape:
-            target_actions = self.targetActor(states_)
+            target_actions = self.targetActor(ohclv_,asseProp_,cash_)
             # this is the future reward; reward at next time step
             critic_value_ = tf.squeeze(self.targetCritic(
-                                states_, target_actions), 1)
-            critic_value = tf.squeeze(self.critic(states, actions), 1)
-            target = rewards + self.gamma*critic_value_*(1-done)
+                                ohclv_,asseProp_,cash_, target_actions), 1)
+            critic_value = tf.squeeze(self.critic(ohclv,asseProp,cash, 
+                                                asseProp_), 1)
+            target = reward + self.gamma*critic_value_*(1-done)
             critic_loss = keras.losses.MSE(target, critic_value)
 
         critic_network_gradient = tape.gradient(critic_loss,
@@ -139,8 +130,8 @@ class agent(env):
             critic_network_gradient, self.critic.trainable_variables))
         
         with tf.GradientTape() as tape:
-            new_policy_actions = self.actor(states)
-            actor_loss = -self.critic(states, new_policy_actions)
+            new_policy_actions = self.actor(ohclv_,asseProp_,cash_)
+            actor_loss = -self.critic(ohclv_,asseProp_,cash_, new_policy_actions)
             actor_loss = tf.math.reduce_mean(actor_loss)
 
         actor_network_gradient = tape.gradient(actor_loss,

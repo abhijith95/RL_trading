@@ -33,14 +33,16 @@ def trainAgent(saveDir):
         initPortfolioValue = tradingAgent.getReward()
         
         for index in range(startIndex, startIndex+EPOCH_SIZE):
-            state = tradingAgent.getState(index)
-            action = tradingAgent.takeAction(state)
+            ohclv,assetProp,cash = tradingAgent.getState(index)
+            action = tradingAgent.takeAction(ohclv,assetProp,cash)
             action_ = np.array(action).reshape(tradingAgent.noOfAssets,)
             tradingAgent.stepDt(action_,index)
             reward = tradingAgent.getReward()
             done = tradingAgent.isDone()
-            newState = tradingAgent.getState(index+1)
-            tradingAgent.remember(state,action,reward,newState,done)
+            ohclv_,assetProp_,cash_ = tradingAgent.getState(index+1)
+            tradingAgent.remember(ohclv,assetProp,cash,
+                                ohclv_,assetProp_,cash_,
+                                reward,done)
             tradingAgent.learn()
             
             if done:
@@ -90,4 +92,4 @@ def testAgent(actorModel):
 
 bestModel = trainAgent(MODEL_SAVE_DIR)
 bestModel = tf.keras.models.load_model(MODEL_SAVE_DIR)
-testAgent(bestModel)
+# testAgent(bestModel)

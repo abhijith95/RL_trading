@@ -27,8 +27,10 @@ class env:
         for sheet in sheetNames:
             # standardizing the testing and training data
             self.dfs[sheet]=pd.read_excel(dataFile, sheet_name=sheet)
-            self.train[sheet]=self.dfs[sheet].iloc[trainingIndex[0]:trainingIndex[1],0:-1]
-            self.test[sheet]=self.dfs[sheet].iloc[trainingIndex[1]:,0:-1]
+            temp=self.dfs[sheet].iloc[trainingIndex[0]:trainingIndex[1],0:-1]
+            self.train[sheet] = (temp-temp.mean())/temp.std()
+            temp=self.dfs[sheet].iloc[trainingIndex[1]:,0:-1]
+            self.test[sheet] = (temp-temp.mean())/temp.std()
         
         # -1 because columns include date as well
         self.noOfAssets = len(self.dfs["Open"].columns) - 1 
@@ -60,6 +62,8 @@ class env:
             state (tensor): the past marketMemory days of OHCLV value for
             all the assets. The shape of the tensor is (number_of_price_features,
             self.marketMemory, self.noOfAssets)
+            asseProp (tensor): asset proportions. Shape of tensor is (1,number_of_assets)
+            cash (float): remaining cash value in the portfolio
         """
         state = []
         for key in self.dfs:
@@ -74,7 +78,13 @@ class env:
         state = tf.convert_to_tensor(state)
         state = tf.reshape(state, shape=[1,self.noOfPriceFeatures,
                                         self.marketMemory,self.noOfAssets])
-        return state
+        
+        assetProp = tf.reshape(tf.convert_to_tensor(self.assetProp),
+                                shape = [1,len(self.assetProp)])
+        cash = tf.reshape(tf.convert_to_tensor(self.cash),
+                        shape = [1,1])
+        
+        return state,assetProp,cash
 
     def transact(self,action,index,train):
         """Function that buys and sells assets. The cash used to buy
@@ -89,10 +99,10 @@ class env:
         # action = np.array(action)
         delta = (action - self.assetProp)*self.portVal
         if train:
-            price = np.array(self.train["Close"].iloc[index,:])        
+            price = np.array(self.dfs["Close"].iloc[index,0:1])        
         else:
             index+=self.trainingIndex[1]
-            price = np.array(self.test["Close"].iloc[index,:])
+            price = np.array(self.dfs["Close"].iloc[index,0:1])
             
         noOfShares = np.abs(delta/price)
         # mask 1 is to filter out those assets whose shares to transact is less than 1
@@ -121,12 +131,12 @@ class env:
         # buying and selling assets
         self.transact(action,index,train) 
         if train:       
-            priceRatio = np.array(self.train["Close"].iloc[index+1,:]) / \
-                            np.array(self.train["Close"].iloc[index,:])
+            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:1]) / \
+                            np.array(self.dfs["Close"].iloc[index,0:1])
         else:
             index+=self.trainingIndex[1]
-            priceRatio = np.array(self.test["Close"].iloc[index+1,:]) / \
-                        np.array(self.test["Close"].iloc[index,:])
+            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:1]) / \
+                        np.array(self.dfs["Close"].iloc[index,0:1])
         self.assetVal = self.assetVal * priceRatio
         self.portVal = np.sum(self.assetVal)
                 
