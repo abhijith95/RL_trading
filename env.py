@@ -48,6 +48,7 @@ class env:
         # initially the asset proportion will be uniform and equal
         self.assetProp = np.ones(self.noOfAssets) * (1/self.noOfAssets)
         self.cash = np.copy(self.maxAssetOrder)     
+        # asset value is the actually amount of money invested in each asset
         self.assetVal = self.assetProp * (self.totalInv)
         self.portVal = np.sum(self.assetVal)  
         self.penalty = 0  # if cash is depleted the agent gets a big penalty
@@ -75,13 +76,13 @@ class env:
                 state.append(list(np.array(self.test[key].iloc
                                         [index - self.marketMemory:index,:])))
         
-        state = tf.convert_to_tensor(state)
+        state = tf.convert_to_tensor(state, dtype=tf.float32)
         state = tf.reshape(state, shape=[1,self.noOfPriceFeatures,
                                         self.marketMemory,self.noOfAssets])
         
-        assetProp = tf.reshape(tf.convert_to_tensor(self.assetProp),
+        assetProp = tf.reshape(tf.convert_to_tensor(self.assetProp, dtype=tf.float32),
                                 shape = [1,len(self.assetProp)])
-        cash = tf.reshape(tf.convert_to_tensor(self.cash),
+        cash = tf.reshape(tf.convert_to_tensor(self.cash, dtype=tf.float32),
                         shape = [1,1])
         
         return state,assetProp,cash
@@ -99,10 +100,10 @@ class env:
         # action = np.array(action)
         delta = (action - self.assetProp)*self.portVal
         if train:
-            price = np.array(self.dfs["Close"].iloc[index,0:1])        
+            price = np.array(self.dfs["Close"].iloc[index,0:-1])        
         else:
             index+=self.trainingIndex[1]
-            price = np.array(self.dfs["Close"].iloc[index,0:1])
+            price = np.array(self.dfs["Close"].iloc[index,0:-1])
             
         noOfShares = np.abs(delta/price)
         # mask 1 is to filter out those assets whose shares to transact is less than 1
@@ -111,6 +112,7 @@ class env:
         # subtracting broker fee for both buy/sell transaction
         self.cash+= -np.sum(mask1*delta) - (np.sum(mask1)*self.brokerFee)               
         self.portVal= np.sum(self.assetVal)  # this should keep the porfolio value unchanged.
+        self.assetProp = action
         if self.cash < 0 or self.portVal < 0:
             # huge penalty if cash reserve is used up!
             self.penalty = -self.totalInv
@@ -131,12 +133,12 @@ class env:
         # buying and selling assets
         self.transact(action,index,train) 
         if train:       
-            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:1]) / \
-                            np.array(self.dfs["Close"].iloc[index,0:1])
+            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:-1]) / \
+                            np.array(self.dfs["Close"].iloc[index,0:-1])
         else:
             index+=self.trainingIndex[1]
-            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:1]) / \
-                        np.array(self.dfs["Close"].iloc[index,0:1])
+            priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:-1]) / \
+                        np.array(self.dfs["Close"].iloc[index,0:-1])
         self.assetVal = self.assetVal * priceRatio
         self.portVal = np.sum(self.assetVal)
                 

@@ -9,7 +9,7 @@ WTS_SAVE_DIR = "C:\\Users\\abhij\\RL_trading\\Best_weights"
 DATA_FILE = "C:\\Users\\abhij\\RL_trading\\Daily_stocks_data\\portfolio.xlsx"
 SHEET_NAMES = ["Open", "High", "Low", "Close", "Volume"]
 TRAINING_INDICES = [0,2259]
-EPOCHS = 2000
+EPOCHS = 5000
 EPOCH_SIZE = 30  # nunber of consecutive days to train the agent
 MARKET_MEMORY = 10
 
@@ -77,10 +77,10 @@ def testAgent(actorModel):
                     len(tradingAgent.test['Close'])-1)
     
     for index in loopRange:        
-        state = tradingAgent.getState(index, False)
-        action = actorModel(state)
-        action = np.array(action).reshape(tradingAgent.noOfAssets,)
-        tradingAgent.stepDt(action,index, False)        
+        ohclv,assetProp,cash = tradingAgent.getState(index)
+        action = tradingAgent.takeAction(ohclv,assetProp,cash)
+        action_ = np.array(action).reshape(tradingAgent.noOfAssets,)
+        tradingAgent.stepDt(action_,index)
         reward = tradingAgent.getReward()
         growthRecord.append((reward)/ initPortfolioValue)
         portfolioVal.append(tradingAgent.portVal/initPortfolioValue)
@@ -92,4 +92,4 @@ def testAgent(actorModel):
 
 bestModel = trainAgent(MODEL_SAVE_DIR)
 bestModel = tf.keras.models.load_model(MODEL_SAVE_DIR)
-# testAgent(bestModel)
+testAgent(bestModel)

@@ -67,7 +67,10 @@ class memory:
                 temp.append(self.bufferList[i][j])            
             if i <= 5:
                 # we don't want to convert rewards and done into tensor
-                temp = tf.convert_to_tensor(temp)
+                batchShape = list(self.bufferList[i][j].shape[1:]) # because the first index refers to batch size
+                batchShape.insert(0,bufferSize)
+                temp = tf.reshape(tf.convert_to_tensor(temp),
+                                    shape = batchShape)
             else:
                 temp = np.array(temp)
             info.append(temp)
