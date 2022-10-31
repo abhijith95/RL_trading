@@ -130,8 +130,8 @@ class agent(env):
             critic_network_gradient, self.critic.trainable_variables))
         
         with tf.GradientTape() as tape:
-            new_policy_actions = self.actor(ohclv_,asseProp_,cash_)
-            actor_loss = -self.critic(ohclv_,asseProp_,cash_, new_policy_actions)
+            new_policy_actions = self.actor(ohclv,asseProp,cash)
+            actor_loss = -self.critic(ohclv,asseProp,cash, new_policy_actions)
             actor_loss = tf.math.reduce_mean(actor_loss)
 
         actor_network_gradient = tape.gradient(actor_loss,

@@ -9,7 +9,7 @@ WTS_SAVE_DIR = "C:\\Users\\abhij\\RL_trading\\Best_weights"
 DATA_FILE = "C:\\Users\\abhij\\RL_trading\\Daily_stocks_data\\portfolio.xlsx"
 SHEET_NAMES = ["Open", "High", "Low", "Close", "Volume"]
 TRAINING_INDICES = [0,2259]
-EPOCHS = 5000
+EPOCHS = 2000
 EPOCH_SIZE = 30  # nunber of consecutive days to train the agent
 MARKET_MEMORY = 10
 
@@ -30,7 +30,7 @@ def trainAgent(saveDir):
         startIndex = random.randint(TRAINING_INDICES[0]+MARKET_MEMORY,
                                     TRAINING_INDICES[1]-EPOCH_SIZE)
         print("Training epoch: ", i)
-        initPortfolioValue = tradingAgent.getReward()
+        initPortfolioValue = tradingAgent.portVal + tradingAgent.cash
         
         for index in range(startIndex, startIndex+EPOCH_SIZE):
             ohclv,assetProp,cash = tradingAgent.getState(index)
@@ -49,7 +49,8 @@ def trainAgent(saveDir):
                 break
             # end for
             
-        growthRecord.append((reward - initPortfolioValue)/ initPortfolioValue)
+        growthRecord.append((tradingAgent.portVal + tradingAgent.cash -\
+                            initPortfolioValue)/ initPortfolioValue)
         
         if reward > bestReward:
             bestReward = reward
@@ -71,25 +72,25 @@ def testAgent(actorModel):
     growthRecord = []
     portfolioVal = []
     tradingAgent.reset()
-    initPortfolioValue = tradingAgent.getReward()
+    initPortfolioValue = tradingAgent.portVal + tradingAgent.cash
     # portfolioVal.append(tradingAgent.portVal)
     loopRange = range(tradingAgent.marketMemory+1,
                     len(tradingAgent.test['Close'])-1)
     
     for index in loopRange:        
-        ohclv,assetProp,cash = tradingAgent.getState(index)
+        ohclv,assetProp,cash = tradingAgent.getState(index, train=False)
         action = tradingAgent.takeAction(ohclv,assetProp,cash)
         action_ = np.array(action).reshape(tradingAgent.noOfAssets,)
-        tradingAgent.stepDt(action_,index)
-        reward = tradingAgent.getReward()
+        tradingAgent.stepDt(action_,index, train=False)
+        reward = tradingAgent.portVal + tradingAgent.cash
         growthRecord.append((reward)/ initPortfolioValue)
         portfolioVal.append(tradingAgent.portVal/initPortfolioValue)
     
     print("Cumulative gains = ", 
         ((reward - initPortfolioValue)/ initPortfolioValue))
-    plt.plot(loopRange, growthRecord)
+    plt.plot(loopRange, portfolioVal)
     plt.show()
 
-bestModel = trainAgent(MODEL_SAVE_DIR)
+# bestModel = trainAgent(MODEL_SAVE_DIR)
 bestModel = tf.keras.models.load_model(MODEL_SAVE_DIR)
 testAgent(bestModel)

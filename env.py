@@ -52,6 +52,7 @@ class env:
         self.assetVal = self.assetProp * (self.totalInv)
         self.portVal = np.sum(self.assetVal)  
         self.penalty = 0  # if cash is depleted the agent gets a big penalty
+        self.reward = 0
         
     def getState(self, index, train=True):
         """Method that returns the current state of the environment
@@ -110,7 +111,8 @@ class env:
         mask1 = np.where(noOfShares>1,1,0)
         self.assetVal = self.assetVal+(mask1*delta)
         # subtracting broker fee for both buy/sell transaction
-        self.cash+= -np.sum(mask1*delta) - (np.sum(mask1)*self.brokerFee)               
+        self.cash+= -np.sum(mask1*delta) - (np.sum(mask1)*self.brokerFee)
+        self.reward = -np.sum(mask1*delta) - (np.sum(mask1)*self.brokerFee)              
         self.portVal= np.sum(self.assetVal)  # this should keep the porfolio value unchanged.
         self.assetProp = action
         if self.cash < 0 or self.portVal < 0:
@@ -140,6 +142,7 @@ class env:
             priceRatio = np.array(self.dfs["Close"].iloc[index+1,0:-1]) / \
                         np.array(self.dfs["Close"].iloc[index,0:-1])
         self.assetVal = self.assetVal * priceRatio
+        self.reward+= np.sum(self.assetVal) - self.portVal
         self.portVal = np.sum(self.assetVal)
                 
     def getReward(self):
@@ -147,7 +150,7 @@ class env:
         if done:
             return 0
         else:
-            return (self.portVal+self.cash)
+            return (self.reward)
     
     def isDone(self):
         """If the cash reserve is used up the epoch will end.
